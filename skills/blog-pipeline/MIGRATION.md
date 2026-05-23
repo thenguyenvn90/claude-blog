@@ -14,16 +14,30 @@
 
 ## Migration items
 
-### M0 — WordPress Publish skill (CRITICAL)
+### M0 — WordPress Publish skill (CRITICAL) ✅ DONE
 
-- **Source**: `~/.claude/skills/ng-publish/SKILL.md` — 10-step WP REST + Rank Math + 24h schedule + 9-check verification
-- **Target**: NEW skill `skills/blog-publish/SKILL.md` on `thenguyenvn90/claude-blog` fork **main** (direct edit, no feature branch per 2026-05-23 pivot)
-- **Pipeline call site**: Phase 6 — currently falls back to `/ng-publish`; will use `/blog-publish` after migration
-- **Effort**: 4h
-- **Status**: 🚧 In-progress
-  - Skeleton already committed to feature branch `feature/blog-publish` (8 files, 250-line SKILL.md + 5 Python stubs)
-  - Next: merge or cherry-pick from feature branch → fork main, then full Python implementation
-- **Commit SHA**: TBD on fork main
+- **Source**: `~/.claude/skills/ng-publish/SKILL.md` v2.2.0 — 10-step WP REST + Rank Math + 24h schedule + 9-check verification
+- **Target**: NEW skill `skills/blog-publish/SKILL.md` on `thenguyenvn90/claude-blog` fork main
+- **Pipeline call site**: Phase 6 — now uses `/blog-publish` (was `/ng-publish` fallback)
+- **Effort actual**: 4-5h (planned: 4h)
+- **Status**: ✅ **Done 2026-05-23**
+- **Commit SHA**: `e6b51f6` on fork main
+- **Files shipped**:
+  - `SKILL.md` (493 lines: full 10-step orchestration)
+  - `references/md-to-html.md` (155 lines)
+  - `references/image-upload.md` (188 lines)
+  - `references/rankmath-api.md` (135 lines)
+  - `references/post-publish-verify.md` (210 lines)
+  - `references/tag-selection.md` (104 lines)
+  - `references/rollback-rules.md` (150 lines)
+- **Total**: 1435 lines
+- **Generalization from ng-publish**:
+  - Vietnamese-specific bits → `--strict-diacritics` flag (off by default)
+  - `directives/[site]/overrides.md` references → `BRAND.md` (Daniel pattern) or `sites/[name]/BRAND.md` (multi-site)
+  - ongboit category/tag IDs → resolved per-site via WP REST API
+- **Pending** (next commits):
+  - M10 (bidirectional links) — extend `blog-publish` with Phase 6.5 sibling injection
+  - Step 4.5 hardened pre-validation already included in v0.1.0
 
 ### M1 — Engagement formula + format/hook auto-classify (LOW)
 
