@@ -97,37 +97,45 @@
 - **Effort**: 2h
 - **Status**: ⏳ Pending
 
-### M8 — 5-signal decay detection (MEDIUM)
+### M8 — 5-signal decay detection (MEDIUM) ✅ SPEC DONE
 
-- **Source**: ng-decay — age + GSC click decline + external link rot + Jaccard SERP cannibalization + orphan/dead-end. Composite Critical/High/Medium/Low ranking.
-- **Target**: NEW skill `skills/blog-decay/SKILL.md` OR extend `skills/blog-audit/SKILL.md` with composite ranking
-- **Pipeline call site**: Phase 7 — Daniel's blog-audit has site health but no composite decay
-- **Effort**: 3h
-- **Status**: ⏳ Pending
+- **Source**: ng-decay v5.15 — age + GSC click decline + external link rot + Jaccard SERP cannibalization + orphan/dead-end. Composite Critical/High/Medium/Low ranking.
+- **Target**: ✅ NEW skill `skills/blog-decay/` on fork main
+- **Pipeline call site**: Phase 7 — `/blog-decay --site [name]`
+- **Effort actual**: 1.5h spec (full Python impl ~2-3h additional, deferred to v0.2)
+- **Status**: ✅ **Spec Done 2026-05-23**
+- **Files shipped**:
+  - `skills/blog-decay/SKILL.md` (5-signal scoring + composite formula + ranking buckets + output format)
+  - `skills/blog-decay/references/5-signal-scoring.md` (per-signal Python pseudocode + edge cases)
 
-### M9 — Multi-site overrides (HIGH)
+### M9 — Multi-site overrides (HIGH) ✅ SPEC DONE
 
 - **Source**: ng-* `directives/[site]/overrides.md` pattern — `--site` flag routes to per-site config
-- **Target**: extend Daniel's v1.8.0+ untrusted-data contract (`scripts/load_untrusted_root.py`) to support `sites/[name]/BRAND.md` lookup
-- **Pipeline call site**: Phase 0 — currently single-site only. Agency buyer use case needs multi-site.
-- **Effort**: 2h
-- **Status**: ⏳ Pending
+- **Target**: ✅ documented in `skills/blog-pipeline/SKILL.md` (Multi-site mode section)
+- **Pipeline call site**: Phase 0 setup verification logic + multi-site folder convention
+- **Effort actual**: 0.5h documentation (full Daniel scripts/load_untrusted_root.py extension deferred to v0.2 — orchestrator handles fallback via cd + Daniel skill auto-loads from CWD)
+- **Status**: ✅ **Spec Done 2026-05-23**
+- **Note**: Full implementation = extend `scripts/load_untrusted_root.py` to detect `sites/[name]/BRAND.md` based on env var or CLI flag. Documented but not Python-implemented since orchestrator-level cd approach works.
 
-### M10 — Bidirectional internal links (MEDIUM)
+### M10 — Bidirectional internal links (MEDIUM) ✅ SPEC DONE
 
-- **Source**: ng-publish Step 11 (P0/P1/P2 reciprocal injection) + ng-* v5.24 Phase 6.5 explicit bidirectional pass
-- **Target**: extend `skills/blog-publish` Step 9 (Asset Integrity) OR new sub-skill `blog-internal-links`
-- **Pipeline call site**: Phase 6 (after publish)
-- **Effort**: 2h
-- **Status**: ⏳ Pending (depends on M0 landing first)
+- **Source**: ng-publish v5.24 Phase 6.5 — sibling injection with priority rules (P0 pillar→spoke, P1 sibling, P2 cross-cluster)
+- **Target**: ✅ extended `skills/blog-publish/SKILL.md` Step 9 + new reference doc
+- **Pipeline call site**: Phase 6 — built into `/blog-publish` Step 9
+- **Effort actual**: 1.5h spec
+- **Status**: ✅ **Spec Done 2026-05-23**
+- **Files shipped**:
+  - `skills/blog-publish/SKILL.md` (Step 9 added)
+  - `skills/blog-publish/references/bidirectional-links.md` (full logic: extract → check → suggest → patch with slug guard + priority rules + skip rules + JSON output schema)
 
-### M11 — Pipeline resume support (LOW)
+### M11 — Pipeline resume support (LOW) ✅ SPEC DONE
 
-- **Source**: ng-* doesn't have this; new design need
-- **Target**: extend `skills/blog-pipeline/SKILL.md` Phase 0 to detect existing `articles/[slug]/pipeline-state.json` and skip completed phases
-- **Pipeline call site**: Phase 0 (new flag `--resume-from [N]`)
-- **Effort**: 2h
-- **Status**: ⏳ Pending
+- **Source**: ng-* doesn't have this — new design for kit reliability
+- **Target**: ✅ documented in `skills/blog-pipeline/SKILL.md` (Resume support section)
+- **Pipeline call site**: Phase 0 — auto-detect existing `pipeline-state.json` + reuse outputs
+- **Effort actual**: 0.5h documentation
+- **Status**: ✅ **Spec Done 2026-05-23**
+- **Flags supported**: `--resume-from [N]`, `--no-resume`, `--restart`
 
 ---
 

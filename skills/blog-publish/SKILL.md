@@ -462,6 +462,31 @@ Generate Application Password: WP Admin → Users → Profile → Application Pa
 | Cross-site slug mismatch | Halt — Step 0.5 guard refuses push |
 | Rank Math pre-validation fail | Halt — Step 4.5 surfaces specific failure + fix guidance |
 
+## Step 9: Bidirectional Internal Link Injection (M10 ✅ v0.2)
+
+After Step 7 verification passes, optionally inject reciprocal inbound links from sibling posts that this new article links TO.
+
+Reason: cluster integrity. When new post X links to existing posts Y, Z, W → those should link BACK to X for topical authority signal + AI citation graph.
+
+```bash
+Step 9.1: Extract outbound internal links from new article (regex)
+Step 9.2: For each target URL:
+  - WP GET target post content
+  - Check if new_url already linked from target (regex match)
+  - If absent → suggest reciprocal anchor (auto-derive from new article title)
+Step 9.3: User confirms suggestions interactively (per-target Y/N)
+Step 9.4: Patch confirmed targets via WP REST API (with slug guard)
+Step 9.5: Log to publish-info.json: backlinks_added: [{post_id, anchor, position}]
+```
+
+See `references/bidirectional-links.md` for full logic + priority rules (P0 pillar→spoke, P1 sibling, P2 cross-cluster).
+
+Skip rules:
+- Target post < 1500 chars (too short for paragraph injection) → skip
+- Anchor not found in target's last 30% content → skip
+- Existing link to new_url already present → skip silently
+- `--no-backlinks` flag → skip entire step
+
 ## References
 
 | File | What it covers |
@@ -472,6 +497,7 @@ Generate Application Password: WP Admin → Users → Profile → Application Pa
 | `references/post-publish-verify.md` | 9-check verification + parallel execution |
 | `references/tag-selection.md` | Tag taxonomy + WP ID resolution |
 | `references/rollback-rules.md` | When + how to rollback (post deletion, draft revert) |
+| `references/bidirectional-links.md` | Phase 6.5 bidirectional injection (M10 v0.2) |
 
 ## Source attribution
 

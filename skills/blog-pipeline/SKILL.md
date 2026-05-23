@@ -321,9 +321,76 @@ Per-phase failure behavior:
 
 If any phase fails, `pipeline-state.json` records `phases.[name].status = "failed"` + error details. User can resume by invoking pipeline with `--resume-from [N]` (BLOCKED until M11 resume support lands).
 
-## Resume support
+## Resume support (M11 ✅ implemented in v0.2)
 
-Currently NOT implemented (would require Phase 0 to detect existing `pipeline-state.json` and skip completed phases). Workaround: user manually deletes failed phase's outputs from `$ARTICLE_DIR/` and re-runs.
+If `articles/[slug]/pipeline-state.json` exists at invocation:
+
+```bash
+Step 0.6 (resume detection):
+  - Read existing pipeline-state.json
+  - For each phase with status == "done":
+    - Mark as ALREADY DONE (skip re-run)
+    - Reuse existing outputs from $ARTICLE_DIR
+  - For first phase with status != "done":
+    - That's the resume point
+    - Resume from there
+
+User override:
+  --resume-from [N]    → force resume from phase N (override auto-detection)
+  --no-resume          → ignore existing state, start fresh (overwrite $ARTICLE_DIR)
+  --restart            → delete $ARTICLE_DIR and start fresh
+
+Resume conditions:
+  - pipeline-state.json must be valid JSON
+  - Schema version must match (skill version)
+  - Output files referenced in pipeline-state.json.phases[].outputs must exist
+  - If any condition fails → halt with diagnostic, ask user (--no-resume or --restart)
+```
+
+**Example resume scenarios:**
+
+| Scenario | Behavior |
+|----------|----------|
+| Phase 3 (write) failed iteration 3, escalated to user | Resume from Phase 3 with `--resume-from 3` after user fixes brief.md |
+| Phase 6 (publish) failed (WP 503) | Resume from Phase 6 — Phase 1-5 outputs reused |
+| Pipeline ran 2 hours ago, user wants to refresh research | `--no-resume` re-runs Phase 1, reuses Phase 2+ outputs if state still valid |
+| Article folder corrupted | `--restart` clears everything |
+
+## Multi-site mode (M9 ✅ documented in v0.2)
+
+With `--site [name]` flag, pipeline reads BRAND.md + VOICE.md from `sites/[name]/` instead of project root:
+
+```
+[project-root]/
+├── BRAND.md                      ← default (single-site fallback)
+├── VOICE.md
+└── sites/
+    ├── client-a/
+    │   ├── BRAND.md              ← /blog-pipeline --site client-a uses this
+    │   └── VOICE.md
+    └── client-b/
+        ├── BRAND.md
+        └── VOICE.md
+```
+
+Phase 0 setup verification logic:
+
+```bash
+if --site [name] flag set:
+  CONFIG_DIR=sites/[name]/
+  if NOT exists $CONFIG_DIR/BRAND.md:
+    halt "Multi-site mode: sites/[name]/BRAND.md not found. Create it first."
+else:
+  CONFIG_DIR=.  (project root)
+  if NOT exists BRAND.md:
+    halt "BRAND.md not found at project root. Run /claude-growth-welcome."
+
+# Article folder reflects site:
+ARTICLE_DIR = articles/[name]/[slug]/  (multi-site)
+            = articles/[slug]/         (single-site default)
+```
+
+Daniel's `scripts/load_untrusted_root.py` reads project-root BRAND.md by default. For multi-site mode, blog-pipeline orchestrator sets working directory to `sites/[name]/` before invoking Daniel skills, OR passes `--brand-md sites/[name]/BRAND.md` flag if Daniel skill supports it.
 
 ## Implementation status
 
