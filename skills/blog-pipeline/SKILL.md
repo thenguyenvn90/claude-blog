@@ -21,7 +21,7 @@ argument-hint: "[keyword] [--site URL] [--no-publish] [--skip-phase N] [--pause-
 license: MIT
 metadata:
   author: thenguyenvn90
-  version: "0.1.0-alpha"
+  version: "0.3.1"
   category: orchestrator
   references:
     - claude-growth/blog-publishing-workflow.md (SOP doc — canonical reference)
@@ -145,6 +145,57 @@ Write article body, headings, FAQ, meta description, and TL;DR in {{BRAND.langua
 
 ---
 
+## Workflow tracker integration (v0.3 NEW — wired in every phase)
+
+Every phase MUST emit tracker events to populate `articles/[slug]/workflow-log.json`. The orchestrator calls `workflow_tracker.py` from Bash at phase boundaries.
+
+**Real subcommands** (script at `~/.claude/scripts/workflow_tracker.py`):
+
+```bash
+# Start a phase (--phase is integer: 0, 1, 2, 3, 4, 6)
+python3 ~/.claude/scripts/workflow_tracker.py start \
+  --slug $SLUG ${SITE:+--site $SITE} --phase $PHASE_NUM --skill $SKILL_NAME
+
+# Log API call (per external tool invocation)
+python3 ~/.claude/scripts/workflow_tracker.py log-api \
+  --slug $SLUG ${SITE:+--site $SITE} --phase $PHASE_NUM \
+  --tool [dataforseo|firecrawl|gemini_image] --endpoint $ENDPOINT --count $N
+
+# Log LLM usage (input/output char counts — tracker computes cost via pricing_tables.json)
+python3 ~/.claude/scripts/workflow_tracker.py log-llm \
+  --slug $SLUG ${SITE:+--site $SITE} --phase $PHASE_NUM \
+  --model [claude-sonnet-4-6|claude-opus-4-7|claude-haiku-4-5] \
+  --input-chars $IN_CHARS --output-chars $OUT_CHARS
+
+# End phase (--status: complete | failed | skipped | cached)
+python3 ~/.claude/scripts/workflow_tracker.py end \
+  --slug $SLUG ${SITE:+--site $SITE} --phase $PHASE_NUM \
+  --status complete \
+  --outputs "articles/$SLUG/brief.md,articles/$SLUG/cluster-plan.json"
+
+# Aggregate totals (called once after Phase 6 in Phase 6.5)
+python3 ~/.claude/scripts/workflow_tracker.py totals --slug $SLUG ${SITE:+--site $SITE}
+```
+
+**Phase number mapping**:
+| Phase | --phase value | Skill name |
+|-------|---------------|------------|
+| 0 Setup | 0 | blog-pipeline |
+| 1 Research | 1 | blog-discourse |
+| 1.5 Cluster | 1 (sub) | blog-cluster |
+| 2 Brief | 2 | blog-brief |
+| 3 Write | 3 | blog-write |
+| 4 Audit | 4 | blog-audit (composite) |
+| 5 Image | 3 (sub) | (inside Phase 3) |
+| 6 Publish | 6 | blog-publish |
+| 6.5 Report | 6 (sub) | blog-report |
+
+If `workflow_tracker.py` not installed (user skipped scripts copy), pipeline continues but `workflow-report.md` will be empty. Tracker failures logged to stderr, never halt the pipeline.
+
+Cost rates from `~/.claude/scripts/pricing_tables.json` — Claude 4.7 / Sonnet 4.6 / Haiku 4.5 / DFS / Gemini / Firecrawl / Banana / WebSearch.
+
+---
+
 ## Master flow — 7 phases
 
 ### Phase 0 — Setup
@@ -156,11 +207,17 @@ Step 0.3: Compute ARTICLE_DIR:
           - If SITE: articles/[SITE]/[SLUG]/
           - Else:    articles/[SLUG]/
 Step 0.4: mkdir -p $ARTICLE_DIR + $ARTICLE_DIR/images
-Step 0.5: Verify BRAND.md + VOICE.md exist at root (or sites/[SITE]/ if multi-site)
+Step 0.4a: workflow_tracker.py start --phase 0 --skill blog-pipeline  ← TRACK
+Step 0.5: Verify BRAND.md + VOICE.md exist:
+          - If SITE: read from sites/[SITE]/BRAND.md (or directives/[SITE]/overrides.md fallback)
+          - Else:    read from project root ./BRAND.md
+          - If --site set but sites/[SITE]/BRAND.md missing → halt + advise creating it
 Step 0.5a: Read BRAND.md fields: language (default: en), locale, timezone
            → set OUTPUT_LANG = BRAND.language
            → log to pipeline-state.json.config.output_language
            → all downstream skills MUST write output in OUTPUT_LANG
+           → Daniel skills read BRAND.md from CWD by default, so pipeline cd's to
+             sites/[SITE]/ before invoking them (or stays at root for single-site)
 Step 0.6: Verify ~/.config/claude-seo/google-api.json exists
 Step 0.7: ToolSearch dataforseo-mcp + nanobanana-mcp + wp-mcp-ultimate availability
 Step 0.8: Initialize pipeline-state.json:
@@ -168,6 +225,7 @@ Step 0.8: Initialize pipeline-state.json:
            "config": {"output_language": OUTPUT_LANG, "locale": LOCALE, "timezone": TZ},
            "phases": {...}}
 Step 0.9: If any prerequisite missing → halt + invoke /claude-growth-welcome
+Step 0.10: workflow_tracker.py end --phase 0 --status complete  ← TRACK
 ```
 
 **Output**: `articles/[slug]/pipeline-state.json` (Phase 0 status: done)
@@ -241,8 +299,20 @@ Step 1.6 (if notebooklm_available + topic matches user's notebooks):
 
 **Phase 1 close**:
 ```bash
-Step 1.7: Update pipeline-state.json: phases.1_research.status = "done"
+Step 1.7: workflow_tracker.py end --phase 1 --status complete \
+          --outputs '[DISCOURSE.md,google-research.md,...]'  ← TRACK
+Step 1.8: Update pipeline-state.json: phases.1_research.status = "done"
           + outputs list + tier_used + duration + api_cost
+```
+
+**Phase 1 opens with**:
+```bash
+Step 1.0: workflow_tracker.py start --phase 1 --skill blog-discourse  ← TRACK
+```
+
+**Per-tool call (any tier)**: after each DFS/Gemini/WebSearch/Firecrawl invocation, emit
+```bash
+workflow_tracker.py log-api --phase 1 --tool dataforseo --endpoint serp_organic_live_advanced --count 1
 ```
 
 **Migration TODO M1**: ng-research v5.6 has engagement formula + content_format/hook_type auto-classify + 6-type gap analysis. Daniel's `blog-discourse` lacks these. → See MIGRATION.md item M1.
@@ -272,6 +342,7 @@ Step 1.5.4: Update pipeline-state.json
 **Invokes**: `/blog brief [keyword]`
 
 ```bash
+Step 2.0: workflow_tracker.py start --phase 2 --skill blog-brief  ← TRACK
 Step 2.1: Read all research files present in $ARTICLE_DIR:
           - DISCOURSE.md (always present)
           - google-research.md (Tier 1) OR dataforseo-research.md (Tier 2) OR websearch-research.md (Tier 3)
@@ -284,6 +355,7 @@ Step 2.3: /blog brief "[keyword]"
 Step 2.4: mv brief.md $ARTICLE_DIR/brief.md (if not already in article dir)
 Step 2.5: User reviews brief.md (--pause-at 2 if flag set)
 Step 2.6: Update pipeline-state.json: phases.2_brief.research_packet_consolidated = true
+Step 2.7: workflow_tracker.py end --phase 2 --status complete --outputs brief.md  ← TRACK
 ```
 
 **Key contract**: brief.md MUST include `## Research Packet` section. This signals Phase 3 /blog write Step 2.0 to skip blog-researcher agent (NO duplicate research).
@@ -297,6 +369,7 @@ Step 2.6: Update pipeline-state.json: phases.2_brief.research_packet_consolidate
 **Invokes**: `/blog write [keyword]`
 
 ```bash
+Step 3.0: workflow_tracker.py start --phase 3 --skill blog-write  ← TRACK
 Step 3.1: Verify $ARTICLE_DIR/brief.md exists with ## Research Packet section
           (consolidated by Phase 2 /blog brief Step 5.5 v0.2)
 Step 3.2: cd to $ARTICLE_DIR (so /blog write Step 2.0 detects brief.md + research_packet)
@@ -319,6 +392,9 @@ Step 3.5: Update pipeline-state.json:
           - phases.3_write.iterations = N
           - phases.3_write.final_score = S
           - phases.3_write.outputs = [list]
+Step 3.6: workflow_tracker.py end --phase 3 --status complete \
+          --outputs '[blog.md,blog.html,images/hero.webp]' \
+          --quality_score $S --iterations $N  ← TRACK
 ```
 
 **🔑 Critical contract (v0.2 fix for v1 duplication risk)**:
@@ -341,6 +417,7 @@ If Step 2.0 skip fails (e.g., brief.md lacks Research Packet section), blog-rese
 **Invokes**: 4 always-on parallel skills + optional tier-1 extras.
 
 ```bash
+Step 4.0: workflow_tracker.py start --phase 4 --skill blog-audit  ← TRACK
 Step 4.1: Read $ARTICLE_DIR/draft.md
 Step 4.2: Spawn 4 always-on parallel Skill invocations:
           - /blog analyze $ARTICLE_DIR/draft.md
@@ -360,6 +437,8 @@ Step 4.6: Composite score:
           - If 75-89: show fix list, prompt user (proceed / rewrite)
           - If < 75: halt, suggest /blog rewrite
 Step 4.7: Update pipeline-state.json: composite_score, outputs, tier_extras_used
+Step 4.8: workflow_tracker.py end --phase 4 --status complete \
+          --quality_score $composite_score --outputs '[audit-report.md]'  ← TRACK
 ```
 
 **Migration TODO M6**: ng-audit composite orchestrator (5 agents in 1 invocation). Daniel requires 4 separate calls.
@@ -382,6 +461,7 @@ No separate invocation. Already handled inside `/blog write` Step 3.3.
 Step 6.0: Check flags:
           - If --no-publish flag set → SKIP Phase 6 entirely; log "user opted out of publish"
           - Else: proceed to Step 6.1
+Step 6.0a: workflow_tracker.py start --phase 6 --skill blog-publish  ← TRACK (skipped if --no-publish)
 Step 6.1: Read $ARTICLE_DIR/draft.md + $ARTICLE_DIR/draft.html + $ARTICLE_DIR/images/
 Step 6.2: /blog-publish $ARTICLE_DIR/draft.md
           → 10-step pipeline: load config → slug drift check → lock images
@@ -390,6 +470,8 @@ Step 6.2: /blog-publish $ARTICLE_DIR/draft.md
           → tags → schedule 24h → 9-check post-publish verification (parallel)
 Step 6.3: Skill outputs publish-info.json → $ARTICLE_DIR/publish-info.json
 Step 6.4: Update pipeline-state.json: post_id, scheduled_for, verification flags
+Step 6.5: workflow_tracker.py end --phase 6 --status complete \
+          --outputs '[publish-info.json]'  ← TRACK
 ```
 
 **Multi-site**: pass `--site [name]` to resolve BRAND.md from `sites/[name]/`.
@@ -412,7 +494,7 @@ Step 6.5.2: /blog report $ARTICLE_DIR
 Step 6.5.3: Console output 1-line summary: "✓ $0.42 / 3m 24s / score 92"
 ```
 
-**Workflow tracker integration**: Every phase from 0 onwards calls `workflow_tracker.py phase_start` at entry + `phase_end` at exit. Each tool/LLM call emits an event with cost. Aggregation runs in Step 6.5.1.
+**Workflow tracker integration**: Every phase from 0 onwards calls `workflow_tracker.py start` at entry + `end` at exit. Each tool/LLM call emits `log-api` or `log-llm` event. Aggregation runs in Step 6.5.1 via `workflow_tracker.py totals`.
 
 **Budget gate** (optional): pipeline accepts `--max-usd N` flag → fails after Phase 6.5 if total > N.
 
@@ -529,21 +611,70 @@ ARTICLE_DIR = articles/[name]/[slug]/  (multi-site)
             = articles/[slug]/         (single-site default)
 ```
 
-Daniel's `scripts/load_untrusted_root.py` reads project-root BRAND.md by default. For multi-site mode, blog-pipeline orchestrator sets working directory to `sites/[name]/` before invoking Daniel skills, OR passes `--brand-md sites/[name]/BRAND.md` flag if Daniel skill supports it.
+Daniel's `scripts/load_untrusted_root.py` reads project-root BRAND.md by default. Multi-site wrapper is implemented inside `blog-pipeline` orchestrator using the **CWD-redirect pattern** below.
 
-## Implementation status
+### Multi-site CWD-redirect pattern (M9 v0.3 — implementation)
 
-🚧 **v0.1.0-alpha** — skeleton orchestrator + folder convention + MIGRATION.md log.
+Daniel skills hardcode reading `BRAND.md` from CWD. Pipeline must redirect CWD before each invocation:
 
-Ready to use:
-- Phase chain logic + per-phase folder output paths
-- Skill routing (Daniel + ng-* fallback markers)
-- `pipeline-state.json` observability schema
+```bash
+# Helper used by every phase invocation:
+invoke_with_site_context() {
+  local skill_cmd="$1"   # e.g. "/blog brief \"$KEYWORD\""
+  if [ -n "$SITE" ]; then
+    pushd "sites/$SITE/" > /dev/null   # cd to per-site config dir
+    eval "$skill_cmd"                  # Daniel skill now reads sites/$SITE/BRAND.md
+    popd > /dev/null
+  else
+    eval "$skill_cmd"                  # single-site: CWD = project root
+  fi
+}
 
-NOT yet ready:
-- Phase 6 `/blog-publish` (waits for M0)
-- `--cluster --execute` (waits for M2)
-- `--resume-from` (future)
+# Phase usage example:
+invoke_with_site_context "/blog brief \"$KEYWORD\""
+invoke_with_site_context "/blog write \"$KEYWORD\""
+invoke_with_site_context "/blog analyze $ARTICLE_DIR/draft.md"
+```
+
+**Why pushd/popd not cd**: `cd` would leak — if any phase fails mid-run, subsequent phases would be in wrong dir. pushd/popd is exception-safe via wrapper try/finally.
+
+**Article outputs**: always written to `articles/[SITE]/[SLUG]/` (absolute path from project root), regardless of CWD. Phase code uses absolute `$ARTICLE_DIR` variable for all file writes.
+
+**Fallback rule**: if `sites/[SITE]/BRAND.md` missing but root `BRAND.md` exists, halt with diagnostic:
+```
+[ERROR] --site $SITE but sites/$SITE/BRAND.md not found.
+
+Either:
+  1. Create sites/$SITE/BRAND.md (recommended for client work)
+  2. Drop --site flag to use root BRAND.md as default config
+```
+
+**Backward compatibility**: pipeline run WITHOUT `--site` flag works exactly as v0.2 (CWD = project root, reads ./BRAND.md). No change for single-site users.
+
+**Limitation**: only `BRAND.md`, `VOICE.md`, and CMS-related per-site config can be overridden via `sites/[name]/`. The `.mcp.json` is project-global (one set of MCP credentials per project). For agency with N clients each on different WP servers, run N separate projects (one project = one MCP config).
+
+## Implementation status (v0.3.1)
+
+✅ **Production-ready** for single-site + multi-site workflows.
+
+Implemented:
+- Phase 0 / 0.7 / 1 / 2 / 3 / 4 / 5 / 6 / 6.5 with explicit workflow_tracker hooks
+- 3-tier graceful degrade (GSC / DataForSEO / WebSearch)
+- Multi-site CWD-redirect pattern (sites/[name]/ via pushd/popd)
+- Multi-language output via BRAND.language
+- `--no-publish`, `--site`, `--skip-phase`, `--cluster`, `--resume-from`, `--max-usd` flags
+- Phase 6 `/blog-publish` (M0 done)
+- Phase 7 `/blog decay` (M8 done)
+- Cost report Phase 6.5 (M12 done)
+- `pipeline-state.json` schema v0.3 + `workflow-log.json` event stream
+
+Pending v0.4+:
+- `--cluster --execute` (M2 — chain brief→write→audit per spoke)
+- Engagement formula in `/blog discourse` (M1)
+- Information Gain prompts in `/blog brief` (M3)
+- Visual Rhythm in blog-reviewer (M4)
+- Naturalness Pass FAIL gate (M5)
+- Site-style image routing (M7)
 
 ## References
 

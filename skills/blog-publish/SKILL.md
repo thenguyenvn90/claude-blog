@@ -20,7 +20,7 @@ argument-hint: "[article.md] [--site URL] [--convert-only] [--skip-convert] [--u
 license: MIT
 metadata:
   author: thenguyenvn90
-  version: "0.1.0"
+  version: "0.3.1"
   category: publish
   source: "Ported from ng-publish v2.2.0 (ongboit.com Vietnamese workflow), generalized to remove VN-specific bits"
 ---

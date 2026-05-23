@@ -19,7 +19,7 @@ argument-hint: "[--site URL] [--gsc-property property] [--top N] [--export forma
 license: MIT
 metadata:
   author: thenguyenvn90
-  version: "0.1.0"
+  version: "0.3.1"
   category: maintenance
   source: "Ported from ng-decay (ongboit.com v5.15 — 5-signal composite ranking)"
 ---

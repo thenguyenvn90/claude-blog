@@ -17,7 +17,7 @@ argument-hint: "<article-slug-dir> [--compare other-slug-dir] [--site domain] [-
 license: MIT
 compatibility: "Claude Code. Requires Python 3 + workflow_tracker.py at ~/.claude/scripts/"
 metadata:
-  version: "0.1.0"
+  version: "0.3.1"
   pipeline: "blog-pipeline v0.3"
   author: thenguyenvn90
   origin: "Ported from ng-report (ongboit.com workflow v5.14)"
