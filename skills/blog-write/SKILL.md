@@ -91,6 +91,56 @@ See `skills/blog/references/content-templates.md` for detailed selection criteri
 
 ### Phase 2: Research
 
+### Step 2.0 — Pre-research check (NEW v0.2 for pipeline integration)
+
+**BEFORE spawning blog-researcher agent**, check for pre-existing research from upstream pipeline:
+
+```python
+# Pseudocode (Claude executes via Read tool)
+
+# Determine article folder (could be passed via --article-dir flag, OR derived from slug)
+article_dir = "articles/[slug]/"  # or "articles/[site]/[slug]/" if --site flag
+
+# Check for pre-existing research files (produced by blog-pipeline Phase 1-2)
+candidates = [
+    f"{article_dir}brief.md",         # Phase 2 output with research_packet field
+    f"{article_dir}DISCOURSE.md",      # Phase 1 /blog discourse output
+    f"{article_dir}google-research.md" # Phase 1 /blog google output
+]
+existing = [f for f in candidates if os.path.exists(f)]
+
+if "brief.md" in existing:
+    # Read brief.md, check for "research_packet:" YAML field OR ## Research Packet section
+    brief_content = Read(f"{article_dir}brief.md")
+    if "research_packet:" in brief_content or "## Research Packet" in brief_content:
+        # Skip blog-researcher agent — research already done
+        print("Step 2.0 PASS: research_packet found in brief.md → skipping blog-researcher")
+        print("Reusing upstream pipeline's pre-gathered research data")
+        return load_research_packet_from_brief(brief_content)
+
+# Fallback: no pre-existing research → spawn blog-researcher as documented below
+print("Step 2.0: no upstream research detected → spawning blog-researcher agent")
+```
+
+**Behavior matrix:**
+
+| Scenario | Action | Spawn researcher? |
+|----------|--------|-------------------|
+| Called via blog-pipeline (brief.md w/ research_packet exists) | Reuse pre-gathered research | ❌ NO (skip) |
+| Called directly `/blog write [topic]` (no brief.md) | Standard flow | ✅ YES |
+| Called with `--from-brief brief.md` explicit flag | Reuse research from brief | ❌ NO |
+| brief.md exists but research_packet field missing | Researcher still runs (incomplete data) | ✅ YES |
+
+**Backward compatibility**: when invoked directly (not via pipeline), Step 2.0 finds no brief.md → falls through to standard `blog-researcher` agent spawn. Existing `/blog write` workflows unchanged.
+
+**Why this exists**: blog-pipeline (claude-growth orchestrator) runs Phase 1 research separately (/blog discourse + /blog google + optional gsc-* + notebooklm). Phase 2 /blog brief consolidates into `brief.md.research_packet`. Without Step 2.0, blog-write would re-do all that work via blog-researcher — wasted API calls + slower pipeline.
+
+If skipped, log to caller context: `research_packet_reused: true` so pipeline tracks for observability (e.g., `pipeline-state.json.phases.3_write.research_packet_reused`).
+
+---
+
+### Step 2.1 — Standard research (when Step 2.0 skip not applicable)
+
 Spawn a `blog-researcher` agent (or do inline research with WebSearch):
 
 1. **Find 8-12 current statistics** (2025-2026 data preferred)

@@ -264,7 +264,69 @@ claim that can stand alone when quoted.
   statistics in the post, hashtag suggestions]
 ```
 
+### Step 5.5: Consolidate research_packet (NEW v0.2 for pipeline integration)
+
+If invoked from `/blog-pipeline` (Phase 2), `articles/[slug]/` may contain pre-existing research files from Phase 1. Consolidate them into the brief so Phase 3 `/blog write` can skip blog-researcher (per blog-write Step 2.0 pre-research check).
+
+```python
+# Pseudocode (Claude executes via Read tool)
+
+article_dir = "articles/[slug]/"  # or "articles/[site]/[slug]/" with --site flag
+
+research_files = [
+    "DISCOURSE.md",            # /blog discourse output (always present)
+    "google-research.md",      # /blog google query + crux + nlp (Tier 1)
+    "gsc-opportunities.md",    # /gsc-opportunities (Tier 1 with ng-* installed)
+    "dataforseo-research.md",  # /seo dataforseo (Tier 2 fallback)
+    "notebooklm-answers.md",   # /blog notebooklm (if user has notebooks)
+]
+
+available = [f for f in research_files if os.path.exists(f"{article_dir}{f}")]
+
+if not available:
+    # No upstream research → skip Step 5.5, blog-write will run blog-researcher
+    return
+```
+
+If any research files present, append `## Research Packet` section to brief output:
+
+```markdown
+## Research Packet (auto-consolidated from Phase 1)
+
+**Research tier**: 1 (GSC) | 2 (DataForSEO) | 3 (WebSearch only)
+**Source files**: [list of available files]
+
+### Stats to cite (verified from research)
+1. [statistic] — Source: [publisher], URL: [link], Retrieved: [date]
+2. [statistic] — Source / URL / Date
+...
+
+### Discourse signals (from DISCOURSE.md)
+- Top engagement: [Reddit thread title, upvotes]
+- Common questions surfacing last 30 days: [list]
+- Gaps in existing discourse: [list]
+
+### Search opportunities (from google-research.md + gsc-opportunities.md)
+- GSC top queries: [list if Tier 1]
+- Striking-distance keywords (pos 5-20): [from gsc-opportunities]
+- Entity gaps (NLP analysis): [list]
+
+### Competitor analysis (from research files)
+- Top 5 SERP URLs: [list]
+- Structural weaknesses: [bullets]
+
+### Pipeline integration signal
+- research_packet_present: true
+- Phase 3 /blog write Step 2.0 should detect this section and skip blog-researcher
+```
+
+**Backward compatibility**: brief.md without Research Packet section works identically to v0.1 — blog-write Step 2.0 falls through to standard blog-researcher spawn for direct (non-pipeline) /blog brief invocations.
+
 ### Step 6: Save the Brief
 
 Save to the user's project as `briefs/[slug]-brief.md` or to a location
-they specify. Confirm the brief is ready for `/blog write`.
+they specify.
+
+If invoked via pipeline (article_dir context detected), save to
+`articles/[slug]/brief.md` instead (per blog-pipeline folder convention).
+Confirm the brief is ready for `/blog write`.

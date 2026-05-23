@@ -17,7 +17,7 @@ allowed-tools:
   - Edit
   - Skill
 user-invokable: true
-argument-hint: "[keyword] [--site URL] [--skip-phase N] [--pause-at N] [--cluster] [--dry-run]"
+argument-hint: "[keyword] [--site URL] [--no-publish] [--skip-phase N] [--pause-at N] [--cluster] [--dry-run]"
 license: MIT
 metadata:
   author: thenguyenvn90
@@ -142,22 +142,75 @@ Step 0.9: If any prerequisite missing → halt + invoke /claude-growth-welcome
 
 ---
 
-### Phase 1 — Research
+### Phase 0.7 — Research capability detection (NEW v0.2)
 
-**Invokes**: `/blog discourse` + `/blog google` + optional `/blog notebooklm`
+Before Phase 1, probe what research skills are available + determine tier:
 
 ```bash
-Step 1.1: cd to ARTICLE_DIR (or pass --out flag if Daniel skill supports)
+Step 0.7.1: Check ~/.config/claude-seo/google-api.json + gsc_property → set gsc_available
+Step 0.7.2: ToolSearch select:dataforseo-mcp → set dataforseo_available
+Step 0.7.3: ToolSearch select:gsc-opportunities → set gsc_extras_available (ng-* setup)
+Step 0.7.4: Check user notebooks configured → set notebooklm_available
+Step 0.7.5: Determine research tier:
+            tier = 1 if gsc_available else 2 if dataforseo_available else 3
+Step 0.7.6: Log to pipeline-state.json:
+            phases.0_setup.research_capabilities = {...all flags above...}
+            phases.0_setup.research_tier = tier
+```
+
+This drives Phase 1 + Phase 4 routing — graceful degrade if GSC absent (agency client scenario).
+
+---
+
+### Phase 1 — Research (3-tier graceful degrade)
+
+**Discourse layer** (always runs, all tiers):
+```bash
+Step 1.1: cd to ARTICLE_DIR
 Step 1.2: /blog discourse "[keyword]"
-          → Daniel writes DISCOURSE.md to project root by default
-          → After: mv DISCOURSE.md $ARTICLE_DIR/DISCOURSE.md
-Step 1.3: /blog google query "[keyword]"
-          → capture output → save to $ARTICLE_DIR/google-research.md
-Step 1.4: /blog google crux-history (optional, append to google-research.md)
-Step 1.5: /blog google nlp [keyword] (optional, append to google-research.md)
-Step 1.6 (OPTIONAL): /blog notebooklm ask [notebook] "[research question]"
-          → save output to $ARTICLE_DIR/notebooklm-answers.md
-Step 1.7: Update pipeline-state.json: phases.1_research.status = "done", outputs, duration, api_cost
+          → produces DISCOURSE.md at project root
+          → mv DISCOURSE.md → $ARTICLE_DIR/DISCOURSE.md
+```
+
+**Tier 1 — GSC CONNECTED (preferred, owned site)**:
+```bash
+Step 1.3 (Tier 1): /blog google query "[keyword]"
+          → save to $ARTICLE_DIR/google-research.md
+Step 1.4 (Tier 1): /blog google crux-history (optional)
+Step 1.5 (Tier 1): /blog google nlp [keyword] (optional, NLP entities)
+Step 1.6 (Tier 1, if gsc_extras_available): /gsc-opportunities --site [domain]
+          → save to $ARTICLE_DIR/gsc-opportunities.md (striking-distance pos 5-20)
+```
+
+**Tier 2 — DataForSEO PAID (client site, no GSC access)**:
+```bash
+Step 1.3 (Tier 2): /seo dataforseo serp "[keyword]"
+          → save top 10 + PAA to $ARTICLE_DIR/dataforseo-research.md
+Step 1.4 (Tier 2): /seo dataforseo keywords "[keyword]"
+          → volume + KD + intent → append to dataforseo-research.md
+Step 1.5 (Tier 2): /seo dataforseo competitors "[keyword]"
+          → top competitor analysis → append to dataforseo-research.md
+```
+
+**Tier 3 — WebSearch FALLBACK (free, last resort)**:
+```bash
+Step 1.3 (Tier 3): WebSearch "[keyword]" + WebFetch top 3-5 URLs
+          → save to $ARTICLE_DIR/websearch-research.md (lighter data)
+Step 1.4 (Tier 3): WebSearch "[keyword] competitor analysis"
+          → competitor signals → append
+```
+
+**Optional NotebookLM (any tier)**:
+```bash
+Step 1.6 (if notebooklm_available + topic matches user's notebooks):
+          /blog notebooklm ask [notebook] "[research question]"
+          → save to $ARTICLE_DIR/notebooklm-answers.md
+```
+
+**Phase 1 close**:
+```bash
+Step 1.7: Update pipeline-state.json: phases.1_research.status = "done"
+          + outputs list + tier_used + duration + api_cost
 ```
 
 **Migration TODO M1**: ng-research v5.6 has engagement formula + content_format/hook_type auto-classify + 6-type gap analysis. Daniel's `blog-discourse` lacks these. → See MIGRATION.md item M1.
@@ -182,18 +235,26 @@ Step 1.5.4: Update pipeline-state.json
 
 ---
 
-### Phase 2 — Brief
+### Phase 2 — Brief (consolidates research_packet for Phase 3)
 
 **Invokes**: `/blog brief [keyword]`
 
 ```bash
-Step 2.1: Read DISCOURSE.md + google-research.md from $ARTICLE_DIR
-Step 2.2: /blog brief "[keyword]" --research-from $ARTICLE_DIR
-          → produces brief.md (12-template auto-detect, competitive gap, H2/H3, TL;DR draft)
-Step 2.3: mv brief.md $ARTICLE_DIR/brief.md
-Step 2.4: User reviews brief.md (--pause-at 2 if flag set)
-Step 2.5: Update pipeline-state.json
+Step 2.1: Read all research files present in $ARTICLE_DIR:
+          - DISCOURSE.md (always present)
+          - google-research.md (Tier 1) OR dataforseo-research.md (Tier 2) OR websearch-research.md (Tier 3)
+          - gsc-opportunities.md (Tier 1 + ng-* installed)
+          - notebooklm-answers.md (if user notebooks)
+Step 2.2: cd to $ARTICLE_DIR (so /blog brief auto-detects research files via Step 5.5)
+Step 2.3: /blog brief "[keyword]"
+          → /blog brief Step 5.5 (v0.2) consolidates research files into brief.md.research_packet
+          → produces brief.md (12-template auto-detect + competitive gap + H2/H3 + TL;DR + Research Packet section)
+Step 2.4: mv brief.md $ARTICLE_DIR/brief.md (if not already in article dir)
+Step 2.5: User reviews brief.md (--pause-at 2 if flag set)
+Step 2.6: Update pipeline-state.json: phases.2_brief.research_packet_consolidated = true
 ```
+
+**Key contract**: brief.md MUST include `## Research Packet` section. This signals Phase 3 /blog write Step 2.0 to skip blog-researcher agent (NO duplicate research).
 
 **Migration TODO M3**: ng-brief v5.8 has Information Gain Prompts (3 slots). Daniel's blog-brief lacks these.
 
@@ -204,20 +265,37 @@ Step 2.5: Update pipeline-state.json
 **Invokes**: `/blog write [keyword]`
 
 ```bash
-Step 3.1: Read brief.md from $ARTICLE_DIR
-Step 3.2: /blog write "[keyword]" --from-brief $ARTICLE_DIR/brief.md
-          → internally chains agents (researcher → writer → seo → reviewer BLOCKING ≥90)
+Step 3.1: Verify $ARTICLE_DIR/brief.md exists with ## Research Packet section
+          (consolidated by Phase 2 /blog brief Step 5.5 v0.2)
+Step 3.2: cd to $ARTICLE_DIR (so /blog write Step 2.0 detects brief.md + research_packet)
+Step 3.3: /blog write "[keyword]"
+          → /blog write Step 2.0 (v0.2) detects brief.md w/ research_packet → SKIPS blog-researcher agent
+          → blog-writer agent receives research from brief.md (no duplicate WebSearch)
+          → blog-seo agent → on-page validation
+          → blog-reviewer agent BLOCKING ≥90 + zero P0 issues
           → 5-gate Delivery Contract enforces .md + .html + .pdf + hero.png
-          → iteration loop max 3 retries
-Step 3.3: After Daniel's blog-write completes, move outputs to $ARTICLE_DIR:
+          → iteration loop max 3 retries → escalate to user if still fail
+Step 3.4: After /blog write completes, move outputs to $ARTICLE_DIR:
           - draft.md → $ARTICLE_DIR/draft.md
           - draft.html → $ARTICLE_DIR/draft.html
           - draft.pdf → $ARTICLE_DIR/draft.pdf (if exists)
           - hero.png → $ARTICLE_DIR/images/hero.webp (Pillow convert)
           - section-*.png → $ARTICLE_DIR/images/section-*.webp
           - image-manifest.json → $ARTICLE_DIR/image-manifest.json
-Step 3.4: Update pipeline-state.json: iterations, final_score, outputs
+Step 3.5: Update pipeline-state.json:
+          - phases.3_write.research_packet_reused = true (proves no duplication)
+          - phases.3_write.iterations = N
+          - phases.3_write.final_score = S
+          - phases.3_write.outputs = [list]
 ```
+
+**🔑 Critical contract (v0.2 fix for v1 duplication risk)**:
+- Phase 1 outputs research files to $ARTICLE_DIR
+- Phase 2 /blog brief Step 5.5 consolidates into brief.md ## Research Packet section
+- Phase 3 /blog write Step 2.0 detects research packet → SKIPS blog-researcher
+- Result: research happens ONCE in Phase 1, never duplicated in Phase 3
+
+If Step 2.0 skip fails (e.g., brief.md lacks Research Packet section), blog-researcher spawns as fallback (backward compat). Log warning to pipeline-state.json.
 
 **Note**: Phase 5 (image) auto-runs INSIDE blog-write via Hero Image Ladder. Images saved to $ARTICLE_DIR/images/ as part of Step 3.3.
 
@@ -226,24 +304,30 @@ Step 3.4: Update pipeline-state.json: iterations, final_score, outputs
 
 ---
 
-### Phase 4 — Audit (parallel)
+### Phase 4 — Audit (parallel + tier-aware extras)
 
-**Invokes**: 4 parallel skills: `/blog analyze` + `/blog seo-check` + `/blog geo` + `/blog factcheck`
+**Invokes**: 4 always-on parallel skills + optional tier-1 extras.
 
 ```bash
 Step 4.1: Read $ARTICLE_DIR/draft.md
-Step 4.2: Spawn 4 parallel Skill invocations (single message, multiple tool calls):
+Step 4.2: Spawn 4 always-on parallel Skill invocations:
           - /blog analyze $ARTICLE_DIR/draft.md
           - /blog seo-check $ARTICLE_DIR/draft.md
           - /blog geo $ARTICLE_DIR/draft.md
           - /blog factcheck $ARTICLE_DIR/draft.md
-Step 4.3: Aggregate 4 results → write to $ARTICLE_DIR/audit-report.md
-Step 4.4: Composite score:
+Step 4.3 (TIER 1 only — if gsc_extras_available from Phase 0.7):
+          - /gsc-cannibalization --slug [slug]
+            → save to $ARTICLE_DIR/cannibal-check.md (keyword overlap with sibling articles)
+Step 4.4 (TIER 2 only — if dataforseo_available, GSC unavailable):
+          - /seo dataforseo page-intersection [site] [slug]
+            → DFS alternative to GSC cannibalization
+Step 4.5: Aggregate all results → write to $ARTICLE_DIR/audit-report.md
+Step 4.6: Composite score:
           - composite_score = weighted_avg(analyze, seo-check, geo)
           - If ≥ 90: proceed to Phase 6
           - If 75-89: show fix list, prompt user (proceed / rewrite)
           - If < 75: halt, suggest /blog rewrite
-Step 4.5: Update pipeline-state.json: composite_score, outputs
+Step 4.7: Update pipeline-state.json: composite_score, outputs, tier_extras_used
 ```
 
 **Migration TODO M6**: ng-audit composite orchestrator (5 agents in 1 invocation). Daniel requires 4 separate calls.
@@ -258,11 +342,14 @@ No separate invocation. Already handled inside `/blog write` Step 3.3.
 
 ---
 
-### Phase 6 — Publish
+### Phase 6 — Publish (DEFAULT ON; `--no-publish` opts out)
 
 **Invokes**: `/blog-publish` (v0.1.0+ on fork main — M0 ✅ Done 2026-05-23)
 
 ```bash
+Step 6.0: Check flags:
+          - If --no-publish flag set → SKIP Phase 6 entirely; log "user opted out of publish"
+          - Else: proceed to Step 6.1
 Step 6.1: Read $ARTICLE_DIR/draft.md + $ARTICLE_DIR/draft.html + $ARTICLE_DIR/images/
 Step 6.2: /blog-publish $ARTICLE_DIR/draft.md
           → 10-step pipeline: load config → slug drift check → lock images
@@ -300,10 +387,11 @@ Not auto-chained. User invokes manually after publish:
 
 - `--site [name]` — multi-site mode (article folder becomes `articles/[name]/[slug]/`)
 - `--slug [slug]` — override auto-slugify
-- `--skip-phase [N]` — skip phase N (e.g., `--skip-phase 1.5` for cluster, `--skip-phase 6` for publish)
+- `--no-publish` — **NEW v0.2** — skip Phase 6 publish entirely (default IS publish). Stops at Phase 5 with draft + audit done. Useful for: agency client review before publish, testing pipeline without WP commits.
+- `--skip-phase [N]` — skip arbitrary phase N (e.g., `--skip-phase 1.5` for cluster)
 - `--pause-at [N]` — pause after phase N for user review before continuing
 - `--cluster` — invoke Phase 1.5 cluster planning
-- `--dry-run` — execute Phases 1-5 only, skip Phase 6 publish
+- `--dry-run` — execute Phases 1-5 only, no Phase 6 writes (similar to --no-publish but verbose preview)
 
 ## Failure handling
 
