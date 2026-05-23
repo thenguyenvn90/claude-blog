@@ -260,18 +260,24 @@ No separate invocation. Already handled inside `/blog write` Step 3.3.
 
 ### Phase 6 — Publish
 
-**Invokes**: `/blog-publish` if available, else fallback `/ng-publish`
+**Invokes**: `/blog-publish` (v0.1.0+ on fork main — M0 ✅ Done 2026-05-23)
 
 ```bash
 Step 6.1: Read $ARTICLE_DIR/draft.md + $ARTICLE_DIR/draft.html + $ARTICLE_DIR/images/
-Step 6.2: Detect if skill /blog-publish exists:
-          - If exists: /blog-publish $ARTICLE_DIR/draft.md
-          - Else: /ng-publish $ARTICLE_DIR/draft.md (FALLBACK, warns user about VN-specific bits)
-Step 6.3: Publish skill outputs publish-info.json → $ARTICLE_DIR/publish-info.json
-Step 6.4: Update pipeline-state.json: post_id, scheduled_for, fallback_to_ng (bool)
+Step 6.2: /blog-publish $ARTICLE_DIR/draft.md
+          → 10-step pipeline: load config → slug drift check → lock images
+          → md→HTML → pre-upload HTML validation → create DRAFT → patch image URLs
+          → set featured → Rank Math SEO (with Step 4.5 pre-validation HARD gate)
+          → tags → schedule 24h → 9-check post-publish verification (parallel)
+Step 6.3: Skill outputs publish-info.json → $ARTICLE_DIR/publish-info.json
+Step 6.4: Update pipeline-state.json: post_id, scheduled_for, verification flags
 ```
 
-**Migration TODO M0 (CRITICAL)**: build `/blog-publish` on fork main from ng-publish.
+**Multi-site**: pass `--site [name]` to resolve BRAND.md from `sites/[name]/`.
+**Vietnamese sites**: pass `--strict-diacritics` to enforce diacritic ratio >13%.
+**Never auto-publish**: always creates DRAFT (status: future, scheduled 24h out). Use `--now` flag + explicit user confirmation for immediate publish.
+
+**Migration M0 ✅ Done**: `/blog-publish` v0.1.0 — see MIGRATION.md.
 
 ---
 
