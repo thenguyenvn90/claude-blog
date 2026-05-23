@@ -1,0 +1,76 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "last_updated": "2026-04-14",
+    "currency": "USD",
+    "note": "Reference-only. Actual billing from provider dashboards. Update when providers change prices."
+  },
+  "dataforseo": {
+    "serp_organic_live_advanced": 0.002,
+    "serp_youtube_organic_live_advanced": 0.002,
+    "serp_organic_live_regular": 0.0012,
+    "dataforseo_labs_google_keyword_overview": 0.0001,
+    "dataforseo_labs_google_related_keywords": 0.0004,
+    "dataforseo_labs_google_keyword_ideas": 0.0004,
+    "dataforseo_labs_google_keyword_suggestions": 0.0004,
+    "dataforseo_labs_google_ranked_keywords": 0.0001,
+    "dataforseo_labs_google_keywords_for_site": 0.0001,
+    "dataforseo_labs_search_intent": 0.0002,
+    "backlinks_summary": 0.02,
+    "backlinks_backlinks": 0.02,
+    "backlinks_referring_domains": 0.02,
+    "on_page_instant_pages": 0.0005,
+    "on_page_lighthouse": 0.002,
+    "on_page_content_parsing": 0.0006,
+    "content_analysis_search": 0.015,
+    "content_analysis_summary": 0.015,
+    "domain_analytics_whois_overview": 0.0006,
+    "ai_optimization_llm_response": 0.02,
+    "ai_opt_llm_ment_search": 0.015,
+    "business_data_business_listings_search": 0.02,
+    "kw_data_google_ads_search_volume": 0.005,
+    "kw_data_dfs_trends_explore": 0.0005,
+    "kw_data_google_trends_explore": 0.0004,
+    "_default": 0.002
+  },
+  "gemini_image": {
+    "gemini-3.1-flash-image-preview_512": 0.02,
+    "gemini-3.1-flash-image-preview_1K": 0.04,
+    "gemini-3.1-flash-image-preview_2K": 0.08,
+    "gemini-3.1-flash-image-preview_4K": 0.156,
+    "gemini-2.5-flash-image_512": 0.01,
+    "gemini-2.5-flash-image_1K": 0.02,
+    "gemini-2.5-flash-image_2K": 0.04,
+    "_default": 0.08
+  },
+  "firecrawl": {
+    "scrape": 0.001,
+    "crawl": 0.0015,
+    "map": 0.001,
+    "search": 0.0012,
+    "_default": 0.001
+  },
+  "claude_llm": {
+    "claude-opus-4-6": {
+      "input_per_1m": 15.0,
+      "output_per_1m": 75.0,
+      "cached_input_per_1m": 1.5
+    },
+    "claude-sonnet-4-6": {
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0,
+      "cached_input_per_1m": 0.3
+    },
+    "claude-haiku-4-5": {
+      "input_per_1m": 1.0,
+      "output_per_1m": 5.0,
+      "cached_input_per_1m": 0.1
+    }
+  },
+  "wordpress_rest": {
+    "create_post": 0,
+    "upload_media": 0,
+    "update_post": 0,
+    "_note": "WP REST API self-hosted is free"
+  }
+}

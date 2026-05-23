@@ -7,7 +7,7 @@ description: >
   saves each phase's output there. Routes to Daniel's claude-blog +
   claude-seo skills where coverage exists, falls back to ng-* skills for
   features Daniel doesn't have yet. Mirrors the SOP doc at
-  claude-growth/workflow.md. Use when user says "/blog-pipeline",
+  claude-growth/blog-publishing-workflow.md. Use when user says "/blog-pipeline",
   "run blog pipeline", "publish blog end-to-end", "auto write and publish
   blog", or wants single-command article production.
 allowed-tools:
@@ -24,7 +24,7 @@ metadata:
   version: "0.1.0-alpha"
   category: orchestrator
   references:
-    - claude-growth/workflow.md (SOP doc — canonical reference)
+    - claude-growth/blog-publishing-workflow.md (SOP doc — canonical reference)
     - skills/blog-pipeline/MIGRATION.md (ng-* → Daniel migration log)
 ---
 
@@ -32,7 +32,7 @@ metadata:
 
 > Single entry-point for the 7-phase blog publishing pipeline. Per article folder
 > `articles/[slug]/` (or `articles/[site]/[slug]/` with `--site` flag) holds all
-> phase outputs. Reads `workflow.md` for canonical SOP, chains Daniel's
+> phase outputs. Reads `blog-publishing-workflow.md` for canonical SOP, chains Daniel's
 > claude-blog + claude-seo skills with ng-* fallback markers.
 
 ## When to invoke
@@ -119,6 +119,32 @@ Every invocation creates a per-article folder. All phase outputs go here.
 
 ---
 
+## Output language
+
+The pipeline + all sub-skills write OUTPUT in the language declared in BRAND.md `language` field. Skill prompts/rules remain in English (single source of truth); only the article output adapts.
+
+**Behavior:**
+- `language: en` → Write blog.md, briefs, social variants in English
+- `language: vi` → Viết blog.md bằng tiếng Việt + apply Vietnamese-specific rules from quality-rubric.md `## vi` subsection (diacritics >15%, em-dash 0, H2 questions 60-70%)
+- `language: es` → Escribir en español + apply `## es` subsection rules
+- `language: ja` → 日本語で書く + apply `## ja` subsection rules
+- (any ISO 639-1 code → check `quality-rubric.md ## Language-specific quirks` for special rules; default to universal if absent)
+
+**Locale field** (e.g., `en-US`, `vi-VN`, `es-MX`, `pt-BR`) controls:
+- Number/decimal formatting (`1,000` vs `1.000` vs `1.000,00`)
+- Date format (`MM/DD/YYYY` vs `DD/MM/YYYY` vs ISO)
+- Currency symbol placement
+- Regional dialect / Latin vs Castilian Spanish, etc.
+
+**Implementation in each phase prompt** — when invoking sub-skills, pipeline must prepend:
+```
+[CONFIG] output_language={{BRAND.language}} locale={{BRAND.locale}}
+Apply language-specific rules from quality-rubric.md `## {{BRAND.language}}` subsection if present.
+Write article body, headings, FAQ, meta description, and TL;DR in {{BRAND.language}}.
+```
+
+---
+
 ## Master flow — 7 phases
 
 ### Phase 0 — Setup
@@ -131,10 +157,16 @@ Step 0.3: Compute ARTICLE_DIR:
           - Else:    articles/[SLUG]/
 Step 0.4: mkdir -p $ARTICLE_DIR + $ARTICLE_DIR/images
 Step 0.5: Verify BRAND.md + VOICE.md exist at root (or sites/[SITE]/ if multi-site)
+Step 0.5a: Read BRAND.md fields: language (default: en), locale, timezone
+           → set OUTPUT_LANG = BRAND.language
+           → log to pipeline-state.json.config.output_language
+           → all downstream skills MUST write output in OUTPUT_LANG
 Step 0.6: Verify ~/.config/claude-seo/google-api.json exists
 Step 0.7: ToolSearch dataforseo-mcp + nanobanana-mcp + wp-mcp-ultimate availability
 Step 0.8: Initialize pipeline-state.json:
-          {"slug": SLUG, "site": SITE, "keyword": ARG, "started_at": ISO_NOW, "phases": {...}}
+          {"slug": SLUG, "site": SITE, "keyword": ARG, "started_at": ISO_NOW,
+           "config": {"output_language": OUTPUT_LANG, "locale": LOCALE, "timezone": TZ},
+           "phases": {...}}
 Step 0.9: If any prerequisite missing → halt + invoke /claude-growth-welcome
 ```
 
@@ -368,6 +400,24 @@ Step 6.4: Update pipeline-state.json: post_id, scheduled_for, verification flags
 
 ---
 
+### Phase 6.5 — Cost report (NEW v0.3, auto-runs after Phase 6 or Phase 5 if --no-publish)
+
+```bash
+Step 6.5.1: python3 ~/.claude/scripts/workflow_tracker.py totals \
+              --slug $SLUG ${SITE:+--site $SITE}
+Step 6.5.2: /blog report $ARTICLE_DIR
+          → Reads workflow-log.json (auto-populated by each phase's tracker calls)
+          → Generates workflow-report.md in $ARTICLE_DIR
+          → Sections: exec summary + phase breakdown + cost-by-tool + cost-by-LLM + quality + ROI + hints
+Step 6.5.3: Console output 1-line summary: "✓ $0.42 / 3m 24s / score 92"
+```
+
+**Workflow tracker integration**: Every phase from 0 onwards calls `workflow_tracker.py phase_start` at entry + `phase_end` at exit. Each tool/LLM call emits an event with cost. Aggregation runs in Step 6.5.1.
+
+**Budget gate** (optional): pipeline accepts `--max-usd N` flag → fails after Phase 6.5 if total > N.
+
+---
+
 ### Phase 7 — Maintain (OPTIONAL, on demand)
 
 Not auto-chained. User invokes manually after publish:
@@ -377,9 +427,10 @@ Not auto-chained. User invokes manually after publish:
 /blog audit                                          ← site-wide health
 /blog cannibalization                                ← keyword overlap
 /blog calendar                                       ← editorial calendar
+/blog decay [site]                                   ← 5-signal decay scan (M8 NEW v0.2)
 ```
 
-**Migration TODO M8**: ng-decay 5-signal composite ranking. Daniel blog-audit lacks.
+**Migration M8 ✅ Done**: `/blog decay` 5-signal composite ranking — see MIGRATION.md.
 
 ---
 
@@ -496,7 +547,7 @@ NOT yet ready:
 
 ## References
 
-- **SOP doc**: `claude-growth/workflow.md` (canonical, English)
+- **SOP doc**: `claude-growth/blog-publishing-workflow.md` (canonical)
 - **Migration log**: `MIGRATION.md` (this folder)
 - **Comparison matrix**: `claude-growth/pipeline-comparison-matrix.md`
 - **Source ng-* workflow**: `claude_ongBoIT/directives/blog-publishing-workflow.md` (Vietnamese, ongboit-specific)

@@ -137,6 +137,35 @@
 - **Status**: ✅ **Spec Done 2026-05-23**
 - **Flags supported**: `--resume-from [N]`, `--no-resume`, `--restart`
 
+### M12 — Cost observability + workflow report (MEDIUM) ✅ DONE v0.3
+
+- **Source**: ng-report v1.1.0 + `~/.claude/scripts/workflow_tracker.py` + `pricing_tables.json` (ongboit workflow v5.14)
+- **Target**: NEW skill `skills/blog-report/SKILL.md` on fork main + `scripts/workflow_tracker.py`, `scripts/workflow_aggregator.py`, `scripts/pricing_tables.json` ported into fork `scripts/`
+- **Pipeline call site**: Phase 6.5 (NEW) — auto-runs after Phase 6 (or Phase 5 if `--no-publish`)
+- **Effort actual**: ~2h (port + generic refactor + integration spec)
+- **Status**: ✅ **Done 2026-05-23 (v0.3)**
+- **Files shipped**:
+  - `skills/blog-report/SKILL.md`
+  - `skills/blog-report/references/integration-guide.md`
+  - `skills/blog-report/references/report-templates.md`
+  - `scripts/workflow_tracker.py` (413 lines)
+  - `scripts/workflow_aggregator.py` (525 lines)
+  - `scripts/pricing_tables.json` (76 lines — Claude 4.7 + DFS + Gemini + Firecrawl + Banana rates)
+- **Generalization from ng-report**:
+  - Vietnamese-specific report headings → English defaults
+  - `directives/[site]/overrides.md` references → `BRAND.md`
+  - ng-* phase names → blog-pipeline phase names (Phase 0-7)
+  - `--strict-diacritics` quality flag → optional (off by default)
+
+### M13 — Multi-language layer (HIGH) ✅ DONE v0.3
+
+- **Source**: ng-write v5.5+ reads BRAND.md `target_audience` + Vietnamese-specific quality rules in `directives/ongboit.com/quality-rules.md`
+- **Target**: `directives/quality-rubric.md` ## Language-specific quirks section (en/vi/es/fr/ja/zh/pt/id) + `BRAND.md.template` `language:` + `locale:` + `timezone:` fields + `blog-pipeline/SKILL.md` Phase 0.5a + Output language section
+- **Pipeline call site**: Phase 0.5a (NEW) — reads BRAND.language → sets OUTPUT_LANG → all sub-skills receive `[CONFIG] output_language={lang}` prefix
+- **Effort actual**: 0.5h
+- **Status**: ✅ **Done 2026-05-23 (v0.3)**
+- **Pattern**: English instructions everywhere (single source of truth); only output language adapts. Skills auto-load matching `quality-rubric.md ## {{lang}}` subsection.
+
 ---
 
 ## DO NOT migrate (too ongboit-specific)
