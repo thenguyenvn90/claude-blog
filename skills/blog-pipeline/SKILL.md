@@ -260,18 +260,18 @@ No separate invocation. Already handled inside `/blog write` Step 3.3.
 
 ### Phase 6 — Publish
 
-**Invokes**: `/blog-publish-wordpress` if available, else fallback `/ng-publish`
+**Invokes**: `/blog-publish` if available, else fallback `/ng-publish`
 
 ```bash
 Step 6.1: Read $ARTICLE_DIR/draft.md + $ARTICLE_DIR/draft.html + $ARTICLE_DIR/images/
-Step 6.2: Detect if skill /blog-publish-wordpress exists:
-          - If exists: /blog-publish-wordpress $ARTICLE_DIR/draft.md
+Step 6.2: Detect if skill /blog-publish exists:
+          - If exists: /blog-publish $ARTICLE_DIR/draft.md
           - Else: /ng-publish $ARTICLE_DIR/draft.md (FALLBACK, warns user about VN-specific bits)
 Step 6.3: Publish skill outputs publish-info.json → $ARTICLE_DIR/publish-info.json
 Step 6.4: Update pipeline-state.json: post_id, scheduled_for, fallback_to_ng (bool)
 ```
 
-**Migration TODO M0 (CRITICAL)**: build `/blog-publish-wordpress` on fork main from ng-publish.
+**Migration TODO M0 (CRITICAL)**: build `/blog-publish` on fork main from ng-publish.
 
 ---
 
@@ -329,7 +329,7 @@ Ready to use:
 - `pipeline-state.json` observability schema
 
 NOT yet ready:
-- Phase 6 `/blog-publish-wordpress` (waits for M0)
+- Phase 6 `/blog-publish` (waits for M0)
 - `--cluster --execute` (waits for M2)
 - `--resume-from` (future)
 

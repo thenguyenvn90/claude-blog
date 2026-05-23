@@ -17,11 +17,11 @@
 ### M0 — WordPress Publish skill (CRITICAL)
 
 - **Source**: `~/.claude/skills/ng-publish/SKILL.md` — 10-step WP REST + Rank Math + 24h schedule + 9-check verification
-- **Target**: NEW skill `skills/blog-publish-wordpress/SKILL.md` on `thenguyenvn90/claude-blog` fork **main** (direct edit, no feature branch per 2026-05-23 pivot)
-- **Pipeline call site**: Phase 6 — currently falls back to `/ng-publish`; will use `/blog-publish-wordpress` after migration
+- **Target**: NEW skill `skills/blog-publish/SKILL.md` on `thenguyenvn90/claude-blog` fork **main** (direct edit, no feature branch per 2026-05-23 pivot)
+- **Pipeline call site**: Phase 6 — currently falls back to `/ng-publish`; will use `/blog-publish` after migration
 - **Effort**: 4h
 - **Status**: 🚧 In-progress
-  - Skeleton already committed to feature branch `feature/blog-publish-wordpress` (8 files, 250-line SKILL.md + 5 Python stubs)
+  - Skeleton already committed to feature branch `feature/blog-publish` (8 files, 250-line SKILL.md + 5 Python stubs)
   - Next: merge or cherry-pick from feature branch → fork main, then full Python implementation
 - **Commit SHA**: TBD on fork main
 
@@ -65,13 +65,15 @@
 - **Effort**: 2h
 - **Status**: ⏳ Pending
 
-### M6 — Audit master orchestrator (LOW)
+### M6 — Audit composite orchestration (LOW — likely SKIP)
 
 - **Source**: ng-audit chains 5 parallel agents (Quality + SEO + GEO + Factcheck + Forensic) in single invocation
-- **Target**: NEW skill `skills/blog-audit-composite/SKILL.md` on fork main — wraps blog-analyze + blog-seo-check + blog-geo + blog-factcheck in parallel
-- **Pipeline call site**: Phase 4 — currently 4 separate Skill invocations; would become 1
-- **Effort**: 2h
-- **Status**: ⏳ Pending
+- **Target**: 🔧 Extend `skills/blog-analyze/SKILL.md` — add optional sub-skill spawn (`--with-seo-check --with-geo --with-factcheck`) + weighted composite output
+  - **ALTERNATIVE**: SKIP entirely. Pipeline Phase 4 already calls 4 parallel skills + aggregates audit-report.md. No new skill needed.
+- **Pipeline call site**: Phase 4
+- **Effort**: 1-2h (if extend); 0h (if skip)
+- **Status**: ⏳ Pending — **revised round 5 (2026-05-23)**: demoted from NEW skill `blog-audit-composite` to extension/skip
+- **Reasoning**: Daniel's `blog-analyze` already covers 5-category 100pt scoring (content, SEO, E-E-A-T, technical, AI citation). Adding sub-skill spawn for richer aggregation is incremental, not architectural.
 
 ### M7 — Site-style image routing (LOW)
 
@@ -100,7 +102,7 @@
 ### M10 — Bidirectional internal links (MEDIUM)
 
 - **Source**: ng-publish Step 11 (P0/P1/P2 reciprocal injection) + ng-* v5.24 Phase 6.5 explicit bidirectional pass
-- **Target**: extend `skills/blog-publish-wordpress` Step 9 (Asset Integrity) OR new sub-skill `blog-internal-links`
+- **Target**: extend `skills/blog-publish` Step 9 (Asset Integrity) OR new sub-skill `blog-internal-links`
 - **Pipeline call site**: Phase 6 (after publish)
 - **Effort**: 2h
 - **Status**: ⏳ Pending (depends on M0 landing first)
@@ -128,7 +130,7 @@ These ng-* features stay in ng-* (parent repo `claude_ongBoIT`). NOT ported to D
 - ongboit category-specific tag taxonomy (Bắt đầu / So sánh / Hướng dẫn)
 - Skool affiliate CTA injection (v5.24 Phase 8 — ongboit business-specific)
 
-Vietnamese buyers can enable `--strict-diacritics` flag on `/blog-publish-wordpress` (M0 includes this).
+Vietnamese buyers can enable `--strict-diacritics` flag on `/blog-publish` (M0 includes this).
 
 ## Migration cadence
 
