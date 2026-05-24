@@ -166,6 +166,39 @@
 - **Status**: ✅ **Done 2026-05-23 (v0.3)**
 - **Pattern**: English instructions everywhere (single source of truth); only output language adapts. Skills auto-load matching `quality-rubric.md ## {{lang}}` subsection.
 
+### M14 — Refresh pipeline orchestrator (MEDIUM) ✅ DONE v0.4
+
+- **Source**: ng-* `directives/article-refresh-workflow.md` v2.1 (ongboit.com — validated /mcp-la-gi/ indexed <24h)
+- **Target**: NEW skill `skills/blog-refresh-pipeline/SKILL.md` on fork main + `scripts/refresh_preflight.py` (generic, BRAND.language-aware)
+- **Pipeline call site**: New top-level command `/blog-refresh-pipeline [url|path|slug|post_id]` — companion to `/blog-pipeline` (write new). 6 phases: pre-flight backup → diagnose → research → plan → cannibalization → write+push → image audit → verify
+- **Effort actual**: ~3h
+- **Status**: ✅ **Done 2026-05-24 (v0.4)**
+- **Files shipped**:
+  - `skills/blog-refresh-pipeline/SKILL.md` (6-phase orchestrator with mode auto-detect)
+  - `skills/blog-refresh-pipeline/references/cannibalization-check.md`
+  - `skills/blog-refresh-pipeline/references/rollback-procedure.md`
+  - `scripts/refresh_preflight.py` (generic, language-aware quality gate)
+  - `examples/sample-refresh-article/` (4 sample files showing v0.4 output)
+- **Generalization from ng-* article-refresh-workflow**:
+  - Hardcoded AUTH base64 → read from `.mcp.json` wp-mcp-ultimate
+  - Diacritic gate >13% → apply ONLY if `BRAND.language == vi` (M13 pattern)
+  - H2 question ratio 60-75% → universal rule in quality-rubric.md ## vi subsection
+  - `articles/ongboit.com/` hardcoded → `articles/[site]/[slug]/` via `--site` flag (M9 CWD-redirect)
+  - Vietnamese banned phrases → moved to language-specific quirks per VOICE.md taboo list
+- **Scope decision (intentionally dropped from v2 source workflow)**:
+  - ❌ Phase 7 GSC submit + track (claude-growth refresh = content quality, NOT "Crawled-Not-Indexed" recovery)
+  - ❌ Phase 7.5 Escalation Branch (depends on Phase 7)
+  - ❌ Phase 8 Performance Tracking D+14/D+30 (use `/blog decay` separately for site-wide tracking)
+- **Composability**: orchestrator calls existing Daniel skills as sub-steps:
+  - Phase 4.5: `/blog cannibalization`
+  - Phase 5: `/blog rewrite` + `wp_push_safe.py` from `/blog-publish`
+  - Phase 5.5: `/blog image`
+  - All phases emit workflow_tracker events (M12 integration)
+- **Mode auto-detect**: light/medium/full by backup char count
+  - >5000 chars → light (skip Phase 3 research + 4.5 cannibal + 5.5 images)
+  - 3000-5000 chars → medium (default, all 6 phases)
+  - <3000 chars → full (all 6 phases + deeper research)
+
 ---
 
 ## DO NOT migrate (too ongboit-specific)
